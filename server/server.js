@@ -2,11 +2,12 @@ const express = require('express');
 const cors = require('cors');
 const bodyParser = require('body-parser');
 const session = require('express-session');
+const helmet = require('helmet');
+const compression = require('compression');
 require('dotenv').config();
 
 const logger = require('./utils/logger');
-const errorHandler = require('./middleware/errorHandler');
-const sessionMiddleware = require('./middleware/session');
+const { errorHandler, notFound } = require('./middleware/errorHandler');
 
 // Import routes
 const loginRoutes = require('./routes/login');
@@ -21,36 +22,41 @@ const agingRoutes = require('./routes/aging');
 const app = express();
 const PORT = process.env.PORT || 3001;
 
-// Middleware
+// Security middleware
+app.use(helmet());
+app.use(compression());
+
+// CORS configuration
 app.use(cors({
-  origin: ['http://localhost:4200', 'http://127.0.0.1:4200'],
+  origin: ['http://localhost:4200', 'http://127.0.0.1:4200', 'http://0.0.0.0:4200'],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
 }));
 
+// Body parsing middleware
 app.use(bodyParser.json({ limit: '10mb' }));
 app.use(bodyParser.urlencoded({ extended: true, limit: '10mb' }));
 
 // Session middleware
 app.use(session({
-  secret: process.env.SESSION_SECRET || 'vendor-portal-secret',
+  secret: process.env.SESSION_SECRET || 'sap-vendor-portal-secret',
   resave: false,
   saveUninitialized: false,
   cookie: {
-    secure: false,
+    secure: false, // Set to true in production with HTTPS
     httpOnly: true,
     maxAge: 24 * 60 * 60 * 1000 // 24 hours
   }
 }));
 
-// Logging middleware
+// Request logging middleware
 app.use((req, res, next) => {
   logger.info(`${req.method} ${req.path} - ${req.ip}`);
   next();
 });
 
-// Routes
+// API Routes
 app.use('/api/login', loginRoutes);
 app.use('/api/profile', profileRoutes);
 app.use('/api/rfq', rfqRoutes);
@@ -66,18 +72,34 @@ app.get('/api/health', (req, res) => {
     success: true,
     message: 'SAP Vendor Portal API is running',
     timestamp: new Date().toISOString(),
-    version: '1.0.0'
+    version: '1.0.0',
+    environment: process.env.NODE_ENV || 'development'
   });
 });
+
+// 404 handler
+app.use(notFound);
 
 // Error handling middleware
 app.use(errorHandler);
 
 // Start server
-app.listen(PORT, () => {
+app.listen(PORT, '0.0.0.0', () => {
   logger.info(`SAP Vendor Portal Server running on port ${PORT}`);
   logger.info(`Environment: ${process.env.NODE_ENV || 'development'}`);
   logger.info(`SAP Base URL: ${process.env.SAP_BASE_URL}`);
+  logger.info(`Server accessible at: http://localhost:${PORT}`);
+});
+
+// Graceful shutdown
+process.on('SIGTERM', () => {
+  logger.info('SIGTERM received, shutting down gracefully');
+  process.exit(0);
+});
+
+process.on('SIGINT', () => {
+  logger.info('SIGINT received, shutting down gracefully');
+  process.exit(0);
 });
 
 module.exports = app;

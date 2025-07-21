@@ -69,6 +69,14 @@ const errorHandler = (err, req, res, next) => {
     });
   }
 
+  if (err.code === 'ETIMEDOUT') {
+    return res.status(504).json({
+      success: false,
+      message: 'Request timeout. Please try again.',
+      serviceError: true
+    });
+  }
+
   // Default error
   const statusCode = err.statusCode || 500;
   const message = err.message || 'Internal Server Error';

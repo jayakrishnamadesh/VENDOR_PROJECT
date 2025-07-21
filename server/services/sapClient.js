@@ -3,7 +3,7 @@ const logger = require('../utils/logger');
 
 /**
  * SAP OData Client Service
- * Handles all communication with SAP backend
+ * Handles all communication with SAP backend using OData v2
  */
 class SAPClient {
   constructor() {
@@ -11,13 +11,19 @@ class SAPClient {
     this.username = process.env.SAP_USERNAME;
     this.password = process.env.SAP_PASSWORD;
     
+    // Validate configuration
+    if (!this.baseURL || !this.username || !this.password) {
+      logger.error('SAP configuration missing. Check environment variables.');
+    }
+    
     // Create axios instance with default configuration
     this.client = axios.create({
       baseURL: this.baseURL,
       timeout: 30000,
       headers: {
         'Content-Type': 'application/json',
-        'Accept': 'application/json'
+        'Accept': 'application/json',
+        'X-Requested-With': 'XMLHttpRequest'
       },
       auth: {
         username: this.username,
@@ -44,14 +50,16 @@ class SAPClient {
         return response;
       },
       (error) => {
-        logger.error(`SAP Response Error: ${error.response?.status} ${error.config?.url}`, error.message);
+        const status = error.response?.status || 'Unknown';
+        const url = error.config?.url || 'Unknown';
+        logger.error(`SAP Response Error: ${status} ${url} - ${error.message}`);
         return Promise.reject(error);
       }
     );
   }
 
   /**
-   * Login vendor
+   * Login vendor using VENDORLOGINSET
    */
   async login(credentials) {
     try {
@@ -62,7 +70,7 @@ class SAPClient {
       
       return {
         success: true,
-        data: response.data,
+        data: response.data.d || response.data,
         message: 'Login successful'
       };
     } catch (error) {
@@ -72,7 +80,7 @@ class SAPClient {
   }
 
   /**
-   * Get vendor profile
+   * Get vendor profile using PROFILESET
    */
   async getProfile(vendorId) {
     try {
@@ -90,7 +98,7 @@ class SAPClient {
   }
 
   /**
-   * Update vendor profile
+   * Update vendor profile using PROFILESET
    */
   async updateProfile(vendorId, profileData) {
     try {
@@ -108,7 +116,7 @@ class SAPClient {
   }
 
   /**
-   * Get RFQs
+   * Get RFQs using VENDORQUOTATIONS
    */
   async getRFQs(vendorId) {
     try {
@@ -126,97 +134,7 @@ class SAPClient {
   }
 
   /**
-   * Get Purchase Orders
-   */
-  async getPurchaseOrders(vendorId) {
-    try {
-      const response = await this.client.get(`/PURCHASEORDERSET?$filter=VendorId eq '${vendorId}'`);
-      
-      return {
-        success: true,
-        data: response.data.d?.results || response.data.results || response.data,
-        message: 'Purchase Orders retrieved successfully'
-      };
-    } catch (error) {
-      logger.error('SAP PO Error:', error.message);
-      return this.handleError(error, 'Failed to fetch Purchase Orders');
-    }
-  }
-
-  /**
-   * Get Goods Receipts
-   */
-  async getGoodsReceipts(vendorId) {
-    try {
-      const response = await this.client.get(`/GOODSRECEIPTSET?$filter=VendorId eq '${vendorId}'`);
-      
-      return {
-        success: true,
-        data: response.data.d?.results || response.data.results || response.data,
-        message: 'Goods Receipts retrieved successfully'
-      };
-    } catch (error) {
-      logger.error('SAP GR Error:', error.message);
-      return this.handleError(error, 'Failed to fetch Goods Receipts');
-    }
-  }
-
-  /**
-   * Get Invoices
-   */
-  async getInvoices(vendorId) {
-    try {
-      const response = await this.client.get(`/INVOICESET?$filter=VendorId eq '${vendorId}'`);
-      
-      return {
-        success: true,
-        data: response.data.d?.results || response.data.results || response.data,
-        message: 'Invoices retrieved successfully'
-      };
-    } catch (error) {
-      logger.error('SAP Invoice Error:', error.message);
-      return this.handleError(error, 'Failed to fetch Invoices');
-    }
-  }
-
-  /**
-   * Get Payments
-   */
-  async getPayments(vendorId) {
-    try {
-      const response = await this.client.get(`/PAYMENTSET?$filter=VendorId eq '${vendorId}'`);
-      
-      return {
-        success: true,
-        data: response.data.d?.results || response.data.results || response.data,
-        message: 'Payments retrieved successfully'
-      };
-    } catch (error) {
-      logger.error('SAP Payment Error:', error.message);
-      return this.handleError(error, 'Failed to fetch Payments');
-    }
-  }
-
-  /**
-   * Get Aging data
-   */
-  async getAging(vendorId) {
-    try {
-      const response = await this.client.get(`/AGEINGSET?$filter=VendorId eq '${vendorId}'`);
-      
-      return {
-        success: true,
-        data: response.data.d?.results || response.data.results || response.data,
-        message: 'Aging data retrieved successfully'
-      };
-    } catch (error) {
-      logger.error('SAP Aging Error:', error.message);
-      return this.handleError(error, 'Failed to fetch Aging data');
-    }
-  }
-
-  /**
-   * Submit quotation
+   * Submit quotation for RFQ
    */
   async submitQuotation(rfqId, quotationData) {
     try {
@@ -234,7 +152,97 @@ class SAPClient {
   }
 
   /**
-   * Create invoice
+   * Get Purchase Orders using PURCHASEORDERSET
+   */
+  async getPurchaseOrders(vendorId) {
+    try {
+      const response = await this.client.get(`/PURCHASEORDERSET?$filter=VendorId eq '${vendorId}'`);
+      
+      return {
+        success: true,
+        data: response.data.d?.results || response.data.results || response.data,
+        message: 'Purchase Orders retrieved successfully'
+      };
+    } catch (error) {
+      logger.error('SAP PO Error:', error.message);
+      return this.handleError(error, 'Failed to fetch Purchase Orders');
+    }
+  }
+
+  /**
+   * Acknowledge Purchase Order
+   */
+  async acknowledgePO(poId, acknowledgmentData) {
+    try {
+      const response = await this.client.post(`/PURCHASEORDERSET('${poId}')/Acknowledge`, acknowledgmentData);
+      
+      return {
+        success: true,
+        data: response.data.d || response.data,
+        message: 'Purchase Order acknowledged successfully'
+      };
+    } catch (error) {
+      logger.error('SAP PO Acknowledgment Error:', error.message);
+      return this.handleError(error, 'Failed to acknowledge Purchase Order');
+    }
+  }
+
+  /**
+   * Get Goods Receipts using GOODSRECEIPTSET
+   */
+  async getGoodsReceipts(vendorId) {
+    try {
+      const response = await this.client.get(`/GOODSRECEIPTSET?$filter=VendorId eq '${vendorId}'`);
+      
+      return {
+        success: true,
+        data: response.data.d?.results || response.data.results || response.data,
+        message: 'Goods Receipts retrieved successfully'
+      };
+    } catch (error) {
+      logger.error('SAP GR Error:', error.message);
+      return this.handleError(error, 'Failed to fetch Goods Receipts');
+    }
+  }
+
+  /**
+   * Confirm Goods Receipt
+   */
+  async confirmGoodsReceipt(grId, confirmationData) {
+    try {
+      const response = await this.client.post(`/GOODSRECEIPTSET('${grId}')/Confirm`, confirmationData);
+      
+      return {
+        success: true,
+        data: response.data.d || response.data,
+        message: 'Goods Receipt confirmed successfully'
+      };
+    } catch (error) {
+      logger.error('SAP GR Confirmation Error:', error.message);
+      return this.handleError(error, 'Failed to confirm Goods Receipt');
+    }
+  }
+
+  /**
+   * Get Invoices using INVOICESET
+   */
+  async getInvoices(vendorId) {
+    try {
+      const response = await this.client.get(`/INVOICESET?$filter=VendorId eq '${vendorId}'`);
+      
+      return {
+        success: true,
+        data: response.data.d?.results || response.data.results || response.data,
+        message: 'Invoices retrieved successfully'
+      };
+    } catch (error) {
+      logger.error('SAP Invoice Error:', error.message);
+      return this.handleError(error, 'Failed to fetch Invoices');
+    }
+  }
+
+  /**
+   * Create Invoice
    */
   async createInvoice(invoiceData) {
     try {
@@ -252,26 +260,97 @@ class SAPClient {
   }
 
   /**
-   * Error handler
+   * Update Invoice
    */
-  handleError(error, defaultMessage) {
-    const errorMessage = error.response?.data?.error?.message?.value || 
-                        error.response?.data?.message || 
-                        error.message || 
-                        defaultMessage;
-
-    const statusCode = error.response?.status || 500;
-
-    return {
-      success: false,
-      message: errorMessage,
-      statusCode: statusCode,
-      error: process.env.NODE_ENV === 'development' ? error.stack : undefined
-    };
+  async updateInvoice(invoiceId, invoiceData) {
+    try {
+      const response = await this.client.put(`/INVOICESET('${invoiceId}')`, invoiceData);
+      
+      return {
+        success: true,
+        data: response.data.d || response.data,
+        message: 'Invoice updated successfully'
+      };
+    } catch (error) {
+      logger.error('SAP Update Invoice Error:', error.message);
+      return this.handleError(error, 'Failed to update invoice');
+    }
   }
 
   /**
-   * Health check
+   * Submit Invoice
+   */
+  async submitInvoice(invoiceId) {
+    try {
+      const response = await this.client.post(`/INVOICESET('${invoiceId}')/Submit`, {});
+      
+      return {
+        success: true,
+        data: response.data.d || response.data,
+        message: 'Invoice submitted successfully'
+      };
+    } catch (error) {
+      logger.error('SAP Submit Invoice Error:', error.message);
+      return this.handleError(error, 'Failed to submit invoice');
+    }
+  }
+
+  /**
+   * Get Payments using PAYMENTSET
+   */
+  async getPayments(vendorId) {
+    try {
+      const response = await this.client.get(`/PAYMENTSET?$filter=VendorId eq '${vendorId}'`);
+      
+      return {
+        success: true,
+        data: response.data.d?.results || response.data.results || response.data,
+        message: 'Payments retrieved successfully'
+      };
+    } catch (error) {
+      logger.error('SAP Payment Error:', error.message);
+      return this.handleError(error, 'Failed to fetch Payments');
+    }
+  }
+
+  /**
+   * Retry Payment
+   */
+  async retryPayment(paymentId) {
+    try {
+      const response = await this.client.post(`/PAYMENTSET('${paymentId}')/Retry`, {});
+      
+      return {
+        success: true,
+        data: response.data.d || response.data,
+        message: 'Payment retry initiated successfully'
+      };
+    } catch (error) {
+      logger.error('SAP Payment Retry Error:', error.message);
+      return this.handleError(error, 'Failed to retry payment');
+    }
+  }
+
+  /**
+   * Get Aging data using AGEINGSET
+   */
+  async getAging(vendorId) {
+    try {
+      const response = await this.client.get(`/AGEINGSET?$filter=VendorId eq '${vendorId}'`);
+      
+      return {
+        success: true,
+        data: response.data.d?.results || response.data.results || response.data,
+        message: 'Aging data retrieved successfully'
+      };
+    } catch (error) {
+      logger.error('SAP Aging Error:', error.message);
+      return this.handleError(error, 'Failed to fetch Aging data');
+    }
+  }
+
+  /**
+   * Health check for SAP connection
    */
   async healthCheck() {
     try {
@@ -279,15 +358,51 @@ class SAPClient {
       return {
         success: true,
         message: 'SAP connection healthy',
-        data: { status: 'connected' }
+        data: { status: 'connected', timestamp: new Date().toISOString() }
       };
     } catch (error) {
       return {
         success: false,
         message: 'SAP connection failed',
-        error: error.message
+        error: error.message,
+        data: { status: 'disconnected', timestamp: new Date().toISOString() }
       };
     }
+  }
+
+  /**
+   * Error handler for SAP responses
+   */
+  handleError(error, defaultMessage) {
+    let errorMessage = defaultMessage;
+    let statusCode = 500;
+
+    if (error.response) {
+      // SAP returned an error response
+      statusCode = error.response.status;
+      
+      // Try to extract SAP error message
+      const sapError = error.response.data?.error?.message?.value || 
+                      error.response.data?.message || 
+                      error.response.data?.error?.innererror?.errordetails?.[0]?.message;
+      
+      if (sapError) {
+        errorMessage = sapError;
+      }
+    } else if (error.code === 'ECONNREFUSED' || error.code === 'ENOTFOUND') {
+      errorMessage = 'SAP service unavailable. Please check connection.';
+      statusCode = 503;
+    } else if (error.code === 'ETIMEDOUT') {
+      errorMessage = 'SAP service timeout. Please try again.';
+      statusCode = 504;
+    }
+
+    return {
+      success: false,
+      message: errorMessage,
+      statusCode: statusCode,
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    };
   }
 }
 

@@ -10,7 +10,7 @@ router.use(requireAuth);
 
 /**
  * GET /api/profile
- * Get vendor profile
+ * Get vendor profile using PROFILESET
  */
 router.get('/', asyncHandler(async (req, res) => {
   const vendorId = req.vendorId;
@@ -43,15 +43,23 @@ router.get('/', asyncHandler(async (req, res) => {
         vendorId: vendorId,
         vendorName: 'ABC Manufacturing Ltd.',
         email: 'contact@abcmanufacturing.com',
-        phone: '+1-555-123-4567',
-        address: '123 Industrial Park Road',
+        phone: '+91-9876543210',
+        address: '123 Industrial Park Road, Sector 15',
         city: 'Mumbai',
+        state: 'Maharashtra',
         country: 'India',
+        postalCode: '400001',
         taxId: 'GSTIN123456789',
+        panNumber: 'ABCDE1234F',
         bankAccount: 'BANK001234567890',
+        bankName: 'State Bank of India',
+        ifscCode: 'SBIN0001234',
         paymentTerms: 'NET30',
         createdDate: '2023-01-15T00:00:00Z',
-        status: 'Active'
+        status: 'Active',
+        category: 'Manufacturing',
+        rating: 'A+',
+        lastUpdated: new Date().toISOString()
       }
     });
   }
@@ -59,7 +67,7 @@ router.get('/', asyncHandler(async (req, res) => {
 
 /**
  * PUT /api/profile
- * Update vendor profile
+ * Update vendor profile using PROFILESET
  */
 router.put('/', asyncHandler(async (req, res) => {
   const vendorId = req.vendorId;
@@ -100,7 +108,7 @@ router.put('/', asyncHandler(async (req, res) => {
       data: {
         ...profileData,
         vendorId: vendorId,
-        updatedDate: new Date().toISOString()
+        lastUpdated: new Date().toISOString()
       }
     });
   }
@@ -125,12 +133,14 @@ router.get('/summary', asyncHandler(async (req, res) => {
         success: true,
         message: 'Profile summary retrieved successfully',
         data: {
-          vendorId: profile.vendorId,
-          vendorName: profile.vendorName,
-          status: profile.status,
-          email: profile.email,
-          phone: profile.phone,
-          paymentTerms: profile.paymentTerms
+          vendorId: profile.vendorId || profile.VendorId,
+          vendorName: profile.vendorName || profile.VendorName,
+          status: profile.status || profile.Status,
+          email: profile.email || profile.Email,
+          phone: profile.phone || profile.Phone,
+          paymentTerms: profile.paymentTerms || profile.PaymentTerms,
+          category: profile.category || profile.Category,
+          rating: profile.rating || profile.Rating
         }
       });
     } else {
@@ -151,8 +161,10 @@ router.get('/summary', asyncHandler(async (req, res) => {
         vendorName: 'ABC Manufacturing Ltd.',
         status: 'Active',
         email: 'contact@abcmanufacturing.com',
-        phone: '+1-555-123-4567',
-        paymentTerms: 'NET30'
+        phone: '+91-9876543210',
+        paymentTerms: 'NET30',
+        category: 'Manufacturing',
+        rating: 'A+'
       }
     });
   }

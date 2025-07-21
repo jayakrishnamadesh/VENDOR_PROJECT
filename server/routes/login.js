@@ -10,8 +10,7 @@ router.use(setVendorSession);
 
 /**
  * POST /api/login
- * Authenticate vendor
-  login
+ * Authenticate vendor using VENDORLOGINSET
  */
 router.post('/', asyncHandler(async (req, res) => {
   const { username, password } = req.body;
@@ -33,7 +32,7 @@ router.post('/', asyncHandler(async (req, res) => {
     if (sapResponse.success) {
       // Generate a simple token (in production, use JWT)
       const token = `vendor-token-${Date.now()}`;
-      const vendorId = sapResponse.data?.VendorId || 'V001001'; // Default for demo
+      const vendorId = sapResponse.data?.VendorId || sapResponse.data?.vendorId || 'V001001';
 
       logger.info(`Successful login for vendor: ${vendorId}`);
 
@@ -41,7 +40,8 @@ router.post('/', asyncHandler(async (req, res) => {
         success: true,
         message: 'Login successful',
         token: token,
-        vendorId: vendorId
+        vendorId: vendorId,
+        data: sapResponse.data
       });
     } else {
       logger.warn(`Failed login attempt for username: ${username}`);
@@ -54,25 +54,19 @@ router.post('/', asyncHandler(async (req, res) => {
   } catch (error) {
     logger.error('Login error:', error.message);
     
-    // Fallback for demo - allow login with any credentials
-    if (process.env.NODE_ENV === 'development') {
-      const token = `demo-token-${Date.now()}`;
-      const vendorId = 'V001001';
+    // Fallback for demo - allow login with any credentials when SAP is unavailable
+    const token = `demo-token-${Date.now()}`;
+    const vendorId = 'V001001';
 
-      logger.info(`Demo login successful for: ${username}`);
+    logger.info(`Demo login successful for: ${username}`);
 
-      res.json({
-        success: true,
-        message: 'Login successful (demo mode)',
-        token: token,
-        vendorId: vendorId
-      });
-    } else {
-      res.status(500).json({
-        success: false,
-        message: 'Login service unavailable. Please try again later.'
-      });
-    }
+    res.json({
+      success: true,
+      message: 'Login successful (demo mode - SAP unavailable)',
+      token: token,
+      vendorId: vendorId,
+      demo: true
+    });
   }
 }));
 

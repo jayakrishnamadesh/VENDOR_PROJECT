@@ -1,7 +1,7 @@
 {
   "name": "sap-vendor-portal-backend",
   "version": "1.0.0",
-  "description": "SAP Vendor Portal Backend",
+  "description": "SAP Vendor Portal Backend API",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
@@ -14,7 +14,9 @@
     "dotenv": "^16.3.1",
     "express-session": "^1.17.3",
     "body-parser": "^1.20.2",
-    "winston": "^3.11.0"
+    "winston": "^3.11.0",
+    "helmet": "^7.1.0",
+    "compression": "^1.7.4"
   },
   "devDependencies": {
     "nodemon": "^3.0.1"

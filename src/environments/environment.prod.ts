@@ -1,6 +1,6 @@
 export const environment = {
-  production: false,
-  apiUrl: 'http://localhost:3001/api',
+  production: true,
+  apiUrl: '/api',
   appName: 'SAP Vendor Portal',
   version: '1.0.0'
 };

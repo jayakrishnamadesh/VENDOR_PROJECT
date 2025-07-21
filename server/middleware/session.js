@@ -6,8 +6,8 @@ const logger = require('../utils/logger');
  */
 
 const requireAuth = (req, res, next) => {
-  // Skip authentication for login endpoint
-  if (req.path.includes('/login')) {
+  // Skip authentication for login endpoint and health check
+  if (req.path.includes('/login') || req.path.includes('/health')) {
     return next();
   }
 
