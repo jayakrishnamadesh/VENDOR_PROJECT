@@ -24,3 +24,4 @@
 {"level":"warn","message":"Unauthorized access attempt to / from 127.0.0.1","service":"sap-vendor-portal","timestamp":"2025-07-21T18:13:09.884Z"}
 {"level":"warn","message":"Unauthorized access attempt to / from 127.0.0.1","service":"sap-vendor-portal","timestamp":"2025-07-21T18:13:18.094Z"}
 {"level":"warn","message":"Unauthorized access attempt to / from 127.0.0.1","service":"sap-vendor-portal","timestamp":"2025-07-21T18:13:26.310Z"}
+{"level":"warn","message":"Unauthorized access attempt to / from 127.0.0.1","service":"sap-vendor-portal","timestamp":"2025-07-21T18:13:34.523Z"}
