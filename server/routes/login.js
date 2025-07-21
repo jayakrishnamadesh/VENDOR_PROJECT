@@ -2,109 +2,107 @@ const express = require('express');
 const router = express.Router();
 const sapClient = require('../services/sapClient');
 const logger = require('../utils/logger');
-const { asyncHandler } = require('../middleware/errorHandler');
-const { setVendorSession, logout } = require('../middleware/session');
 
-// Apply session middleware
-router.use(setVendorSession);
-
-/**
- * POST /api/login
- * Authenticate vendor using VENDORLOGINSET
- */
-router.post('/', asyncHandler(async (req, res) => {
-  const { username, password } = req.body;
-
-  // Validation
-  if (!username || !password) {
-    return res.status(400).json({
-      success: false,
-      message: 'Username and password are required'
-    });
+// Mock data for fallback
+const mockLoginResponse = {
+  success: true,
+  user: {
+    vendorId: 'V001',
+    vendorName: 'Demo Vendor',
+    email: 'demo@vendor.com',
+    status: 'Active'
   }
+};
 
-  logger.info(`Login attempt for username: ${username}`);
-
+// Login endpoint
+router.post('/login', async (req, res, next) => {
   try {
-    // Call SAP login service
-    const sapResponse = await sapClient.login({ username, password });
+    const { username, password } = req.body;
 
-    if (sapResponse.success) {
-      // Generate a simple token (in production, use JWT)
-      const token = `vendor-token-${Date.now()}`;
-      const vendorId = sapResponse.data?.VendorId || sapResponse.data?.vendorId || 'V001001';
-
-      logger.info(`Successful login for vendor: ${vendorId}`);
-
-      res.json({
-        success: true,
-        message: 'Login successful',
-        token: token,
-        vendorId: vendorId,
-        data: sapResponse.data
-      });
-    } else {
-      logger.warn(`Failed login attempt for username: ${username}`);
-      
-      res.status(401).json({
+    if (!username || !password) {
+      return res.status(400).json({
         success: false,
-        message: sapResponse.message || 'Invalid credentials'
+        error: { message: 'Username and password are required' }
       });
     }
+
+    try {
+      // Attempt SAP authentication
+      const sapResponse = await sapClient.get('/VENDORLOGINSET', {
+        $filter: `Username eq '${username}' and Password eq '${password}'`
+      });
+
+      if (sapResponse.d && sapResponse.d.results && sapResponse.d.results.length > 0) {
+        const user = sapResponse.d.results[0];
+        
+        // Store user in session
+        req.session.user = {
+          vendorId: user.VendorId,
+          vendorName: user.VendorName,
+          email: user.Email,
+          status: user.Status
+        };
+
+        logger.info(`User ${username} logged in successfully`);
+        
+        res.json({
+          success: true,
+          user: req.session.user
+        });
+      } else {
+        res.status(401).json({
+          success: false,
+          error: { message: 'Invalid credentials' }
+        });
+      }
+    } catch (sapError) {
+      logger.warn('SAP login failed, using mock data:', sapError.message);
+      
+      // Fallback to mock authentication
+      if (username === 'demo' && password === 'demo') {
+        req.session.user = mockLoginResponse.user;
+        res.json(mockLoginResponse);
+      } else {
+        res.status(401).json({
+          success: false,
+          error: { message: 'Invalid credentials' }
+        });
+      }
+    }
   } catch (error) {
-    logger.error('Login error:', error.message);
+    next(error);
+  }
+});
+
+// Logout endpoint
+router.post('/logout', (req, res) => {
+  req.session.destroy((err) => {
+    if (err) {
+      logger.error('Session destruction error:', err);
+      return res.status(500).json({
+        success: false,
+        error: { message: 'Logout failed' }
+      });
+    }
     
-    // Fallback for demo - allow login with any credentials when SAP is unavailable
-    const token = `demo-token-${Date.now()}`;
-    const vendorId = 'V001001';
+    res.json({ success: true, message: 'Logged out successfully' });
+  });
+});
 
-    logger.info(`Demo login successful for: ${username}`);
-
+// Check authentication status
+router.get('/status', (req, res) => {
+  if (req.session && req.session.user) {
     res.json({
       success: true,
-      message: 'Login successful (demo mode - SAP unavailable)',
-      token: token,
-      vendorId: vendorId,
-      demo: true
-    });
-  }
-}));
-
-/**
- * POST /api/login/logout
- * Logout vendor
- */
-router.post('/logout', logout);
-
-/**
- * GET /api/login/verify
- * Verify token validity
- */
-router.get('/verify', asyncHandler(async (req, res) => {
-  const authHeader = req.headers.authorization;
-  
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return res.status(401).json({
-      success: false,
-      message: 'No token provided'
-    });
-  }
-
-  const token = authHeader.substring(7);
-  
-  // In production, verify JWT token here
-  if (token && token !== 'null' && token !== 'undefined') {
-    res.json({
-      success: true,
-      message: 'Token is valid',
-      vendorId: req.session?.vendorId || 'V001001'
+      authenticated: true,
+      user: req.session.user
     });
   } else {
-    res.status(401).json({
-      success: false,
-      message: 'Invalid token'
+    res.json({
+      success: true,
+      authenticated: false
     });
   }
-}));
+});
 
 module.exports = router;

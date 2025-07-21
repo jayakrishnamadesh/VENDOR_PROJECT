@@ -1,13 +1,12 @@
 const express = require('express');
 const cors = require('cors');
-const bodyParser = require('body-parser');
-const session = require('express-session');
 const helmet = require('helmet');
-const compression = require('compression');
+const session = require('express-session');
 require('dotenv').config();
 
 const logger = require('./utils/logger');
-const { errorHandler, notFound } = require('./middleware/errorHandler');
+const errorHandler = require('./middleware/errorHandler');
+const sessionMiddleware = require('./middleware/session');
 
 // Import routes
 const loginRoutes = require('./routes/login');
@@ -24,40 +23,28 @@ const PORT = process.env.PORT || 3001;
 
 // Security middleware
 app.use(helmet());
-app.use(compression());
-
-// CORS configuration
 app.use(cors({
-  origin: ['http://localhost:4200', 'http://127.0.0.1:4200', 'http://0.0.0.0:4200'],
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
+  origin: 'http://localhost:4200',
+  credentials: true
 }));
 
 // Body parsing middleware
-app.use(bodyParser.json({ limit: '10mb' }));
-app.use(bodyParser.urlencoded({ extended: true, limit: '10mb' }));
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
 // Session middleware
 app.use(session({
-  secret: process.env.SESSION_SECRET || 'sap-vendor-portal-secret',
+  secret: process.env.SESSION_SECRET || 'fallback-secret',
   resave: false,
   saveUninitialized: false,
-  cookie: {
-    secure: false, // Set to true in production with HTTPS
-    httpOnly: true,
-    maxAge: 24 * 60 * 60 * 1000 // 24 hours
-  }
+  cookie: { secure: false, maxAge: 24 * 60 * 60 * 1000 } // 24 hours
 }));
 
-// Request logging middleware
-app.use((req, res, next) => {
-  logger.info(`${req.method} ${req.path} - ${req.ip}`);
-  next();
-});
+// Custom middleware
+app.use(sessionMiddleware);
 
-// API Routes
-app.use('/api/login', loginRoutes);
+// Routes
+app.use('/api/auth', loginRoutes);
 app.use('/api/profile', profileRoutes);
 app.use('/api/rfq', rfqRoutes);
 app.use('/api/po', poRoutes);
@@ -68,38 +55,16 @@ app.use('/api/aging', agingRoutes);
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {
-  res.json({
-    success: true,
-    message: 'SAP Vendor Portal API is running',
-    timestamp: new Date().toISOString(),
-    version: '1.0.0',
-    environment: process.env.NODE_ENV || 'development'
-  });
+  res.json({ status: 'OK', timestamp: new Date().toISOString() });
 });
-
-// 404 handler
-app.use(notFound);
 
 // Error handling middleware
 app.use(errorHandler);
 
 // Start server
-app.listen(PORT, '0.0.0.0', () => {
-  logger.info(`SAP Vendor Portal Server running on port ${PORT}`);
-  logger.info(`Environment: ${process.env.NODE_ENV || 'development'}`);
-  logger.info(`SAP Base URL: ${process.env.SAP_BASE_URL}`);
-  logger.info(`Server accessible at: http://localhost:${PORT}`);
-});
-
-// Graceful shutdown
-process.on('SIGTERM', () => {
-  logger.info('SIGTERM received, shutting down gracefully');
-  process.exit(0);
-});
-
-process.on('SIGINT', () => {
-  logger.info('SIGINT received, shutting down gracefully');
-  process.exit(0);
+app.listen(PORT, () => {
+  logger.info(`SAP Vendor Portal Backend running on port ${PORT}`);
+  logger.info(`Environment: ${process.env.NODE_ENV}`);
 });
 
 module.exports = app;
