@@ -96,7 +96,7 @@ import { VendorLogin } from '../shared/models/vendor.model';
           <div class="demo-credentials">
             <h4>Demo Credentials:</h4>
             <p><strong>Username:</strong> K901586</p>
-            <p><strong>Password:</strong> Kaar@271103</p>
+            <p><strong>Password:</strong> Kaar&#64;271103</p>
           </div>
           <div class="help-text">
             <p>Having trouble? Contact your system administrator</p>
